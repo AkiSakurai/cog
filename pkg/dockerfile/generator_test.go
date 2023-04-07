@@ -11,6 +11,10 @@ import (
 	"github.com/replicate/cog/pkg/config"
 )
 
+func testInstallRsync() string {
+	return `RUN --mount=type=cache,target=/var/cache/apt apt-get update -qq && apt-get install -qqy rsync && rm -rf /var/lib/apt/lists/*`
+}
+
 func testTini() string {
 	return `RUN --mount=type=cache,target=/var/cache/apt set -eux; \
 apt-get update -qq; \
@@ -26,7 +30,8 @@ ENTRYPOINT ["/sbin/tini", "--"]
 
 func testInstallCog(relativeTmpDir string) string {
 	return fmt.Sprintf(`COPY %s/cog-0.0.1.dev-py3-none-any.whl /tmp/cog-0.0.1.dev-py3-none-any.whl
-RUN --mount=type=cache,target=/root/.cache/pip pip install /tmp/cog-0.0.1.dev-py3-none-any.whl`, relativeTmpDir)
+RUN --mount=type=cache,target=/root/.cache/pip pip install /tmp/cog-0.0.1.dev-py3-none-any.whl
+`, relativeTmpDir)
 }
 
 func testInstallPython(version string) string {
@@ -80,11 +85,11 @@ FROM python:3.8
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/bin
-` + testTini() + testInstallCog(gen.relativeTmpDir) + `
+` + testTini() + testInstallCog(gen.relativeTmpDir) + testInstallRsync() + `
 WORKDIR /src
 EXPOSE 5000
 CMD ["python", "-m", "cog.server.http"]
-COPY . /src`
+RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`
 
 	require.Equal(t, expected, actual)
 }
@@ -109,11 +114,11 @@ FROM nvidia/cuda:11.2.0-cudnn8-devel-ubuntu20.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/bin
-` + testTini() + testInstallPython("3.8") + testInstallCog(gen.relativeTmpDir) + `
+` + testTini() + testInstallPython("3.8") + testInstallCog(gen.relativeTmpDir) + testInstallRsync() + `
 WORKDIR /src
 EXPOSE 5000
 CMD ["python", "-m", "cog.server.http"]
-COPY . /src`
+RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`
 
 	require.Equal(t, expected, actual)
 }
@@ -147,7 +152,7 @@ FROM python:3.8
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/bin
-` + testTini() + testInstallCog(gen.relativeTmpDir) + `
+` + testTini() + testInstallCog(gen.relativeTmpDir) + testInstallRsync() + `
 RUN --mount=type=cache,target=/var/cache/apt apt-get update -qq && apt-get install -qqy ffmpeg cowsay && rm -rf /var/lib/apt/lists/*
 COPY ` + gen.relativeTmpDir + `/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements.txt
@@ -155,7 +160,7 @@ RUN cowsay moo
 WORKDIR /src
 EXPOSE 5000
 CMD ["python", "-m", "cog.server.http"]
-COPY . /src`
+RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`
 	require.Equal(t, expected, actual)
 
 	requirements, err := os.ReadFile(path.Join(gen.tmpDir, "requirements.txt"))
@@ -197,7 +202,7 @@ ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/bin
 ` + testTini() +
 		testInstallPython("3.8") +
-		testInstallCog(gen.relativeTmpDir) + `
+		testInstallCog(gen.relativeTmpDir) + testInstallRsync() + `
 RUN --mount=type=cache,target=/var/cache/apt apt-get update -qq && apt-get install -qqy ffmpeg cowsay && rm -rf /var/lib/apt/lists/*
 COPY ` + gen.relativeTmpDir + `/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r /tmp/requirements.txt
@@ -205,7 +210,7 @@ RUN cowsay moo
 WORKDIR /src
 EXPOSE 5000
 CMD ["python", "-m", "cog.server.http"]
-COPY . /src`
+RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`
 
 	require.Equal(t, expected, actual)
 
@@ -239,13 +244,13 @@ FROM python:3.8
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/bin
-` + testTini() + testInstallCog(gen.relativeTmpDir) + `
+` + testTini() + testInstallCog(gen.relativeTmpDir) + testInstallRsync() + `
 RUN --mount=type=cache,target=/var/cache/apt apt-get update -qq && apt-get install -qqy cowsay && rm -rf /var/lib/apt/lists/*
 RUN cowsay moo
 WORKDIR /src
 EXPOSE 5000
 CMD ["python", "-m", "cog.server.http"]
-COPY . /src`
+RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`
 	require.Equal(t, expected, actual)
 
 }

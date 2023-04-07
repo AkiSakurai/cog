@@ -92,6 +92,7 @@ func (g *Generator) GenerateBase() (string, error) {
 		g.installTini(),
 		installPython,
 		installCog,
+		g.installRsync(),
 		aptInstalls,
 		pipInstalls,
 		run,
@@ -108,7 +109,7 @@ func (g *Generator) Generate() (string, error) {
 	}
 	return strings.Join(filterEmpty([]string{
 		base,
-		`COPY . /src`,
+		`RUN --mount=type=bind,target=/cog-context rsync -au /cog-context/ /src`,
 	}), "\n"), nil
 }
 
@@ -150,6 +151,10 @@ chmod +x /sbin/tini`,
 		`ENTRYPOINT ["/sbin/tini", "--"]`,
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (g *Generator) installRsync() string {
+	return "RUN --mount=type=cache,target=/var/cache/apt apt-get update -qq && apt-get install -qqy rsync && rm -rf /var/lib/apt/lists/*"
 }
 
 func (g *Generator) aptInstalls() (string, error) {
